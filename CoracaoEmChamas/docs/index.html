@@ -1,0 +1,347 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width,
+                   initial-scale=1.0,
+                   maximum-scale=1.0,
+                   user-scalable=no">
+
+    <meta name="theme-color" content="#240807">
+
+    <title>Coração em Chamas | Foto Oficial</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <main class="container">
+
+        <header class="cabecalho">
+
+            <div class="edicao">
+                4º ANIVERSÁRIO
+            </div>
+
+            <h1>
+                CORAÇÃO
+                <span>EM CHAMAS</span>
+            </h1>
+
+            <p class="subtitulo">
+                Jovens e Adolescentes
+            </p>
+
+        </header>
+
+
+        <section class="card">
+
+            <h2>Crie sua foto oficial 🔥</h2>
+
+            <p class="descricao">
+                Escolha sua foto, selecione sua moldura favorita
+                e prepare sua foto de perfil para o WhatsApp.
+            </p>
+
+
+            <div class="editor-container">
+
+                <div class="editor">
+
+                    <canvas id="canvas"
+                            width="1080"
+                            height="1080">
+                    </canvas>
+
+                    <div id="placeholder"
+                         class="placeholder">
+
+                        <span class="icone-camera">
+                            📷
+                        </span>
+
+                        <span>
+                            Sua foto aparecerá aqui
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <input type="file"
+                   id="inputFoto"
+                   accept="image/*"
+                   hidden>
+
+
+            <button id="btnEscolher"
+                    class="btn btn-principal">
+
+                📷 Escolher minha foto
+
+            </button>
+
+
+            <div id="areaEdicao"
+                 class="escondido">
+
+
+                <div class="titulo-secao">
+
+                    <span>🔥</span>
+
+                    <div>
+
+                        <strong>
+                            Escolha sua moldura
+                        </strong>
+
+                        <small>
+                            Toque em uma opção para experimentar
+                        </small>
+
+                    </div>
+
+                </div>
+
+
+                <div class="molduras">
+
+                    <button class="opcao-moldura selecionada"
+                            data-moldura="imagens/moldura1.png">
+
+                        <div class="miniatura">
+                            <img src="imagens/moldura1.png"
+                                 alt="Moldura 1">
+                        </div>
+
+                        <span>Moldura 1</span>
+
+                    </button>
+
+
+                    <button class="opcao-moldura"
+                            data-moldura="imagens/moldura2.png">
+
+                        <div class="miniatura">
+                            <img src="imagens/moldura2.png"
+                                 alt="Moldura 2">
+                        </div>
+
+                        <span>Moldura 2</span>
+
+                    </button>
+
+
+                    <button class="opcao-moldura"
+                            data-moldura="imagens/moldura3.png">
+
+                        <div class="miniatura">
+                            <img src="imagens/moldura3.png"
+                                 alt="Moldura 3">
+                        </div>
+
+                        <span>Moldura 3</span>
+
+                    </button>
+
+
+                    <button class="opcao-moldura"
+                            data-moldura="imagens/moldura4.png">
+
+                        <div class="miniatura">
+                            <img src="imagens/moldura4.png"
+                                 alt="Moldura 4">
+                        </div>
+
+                        <span>Moldura 4</span>
+
+                    </button>
+
+                </div>
+
+
+                <div class="ajustes">
+
+                    <div class="titulo-ajustes">
+
+                        <span>
+                            Ajustar foto
+                        </span>
+
+                        <span class="valor-zoom"
+                              id="valorZoom">
+
+                            100%
+
+                        </span>
+
+                    </div>
+
+
+                    <div class="zoom-container">
+
+                        <span>−</span>
+
+                        <input type="range"
+                               id="zoom"
+                               min="1"
+                               max="3"
+                               step="0.01"
+                               value="1">
+
+                        <span>+</span>
+
+                    </div>
+
+
+                    <p class="dica">
+                        👆 Arraste a foto para posicioná-la
+                        ou use dois dedos para dar zoom.
+                    </p>
+
+
+                    <div class="botoes-menores">
+
+                        <button id="btnCentralizar"
+                                class="btn btn-secundario">
+
+                            ⟳ Centralizar
+
+                        </button>
+
+
+                        <button id="btnTrocarFoto"
+                                class="btn btn-secundario">
+
+                            📷 Trocar foto
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <button id="btnGerar"
+                        class="btn btn-gerar">
+
+                    🔥 GERAR MINHA FOTO
+
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- RESULTADO -->
+
+        <section id="resultado"
+                 class="resultado escondido">
+
+            <div class="icone-sucesso">
+                🔥
+            </div>
+
+            <h2>
+                Sua foto ficou pronta!
+            </h2>
+
+            <p>
+                Salve sua imagem ou compartilhe diretamente
+                pelo seu celular.
+            </p>
+
+
+            <div class="preview-whatsapp">
+
+                <img id="imagemResultado"
+                     alt="Foto oficial Coração em Chamas">
+
+            </div>
+
+
+            <div class="aviso-whatsapp">
+
+                <span>✓</span>
+
+                <p>
+                    Sua imagem está pronta para usar
+                    como foto de perfil.
+                </p>
+
+            </div>
+
+
+            <button id="btnCompartilhar"
+                    class="btn btn-compartilhar">
+
+                📤 Compartilhar foto
+
+            </button>
+
+
+            <button id="btnBaixar"
+                    class="btn btn-download">
+
+                ⬇ Baixar minha foto
+
+            </button>
+
+
+            <button id="btnEditar"
+                    class="btn btn-secundario">
+
+                ← Voltar e ajustar
+
+            </button>
+
+        </section>
+
+
+        <footer>
+
+            <p class="versiculo">
+                “Porventura não ardia em nós o nosso coração,
+                quando, pelo caminho, nos falava...”
+            </p>
+
+            <strong>
+                Lucas 24:32
+            </strong>
+
+            <div class="linha"></div>
+
+            <p class="igreja">
+                IEADAM • BETÂNIA ÁREA 13
+            </p>
+
+        </footer>
+
+    </main>
+
+
+    <!-- NOTIFICAÇÃO -->
+
+    <div id="notificacao"
+         class="notificacao">
+
+        <span id="textoNotificacao"></span>
+
+    </div>
+
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>
