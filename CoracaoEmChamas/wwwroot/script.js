@@ -66,6 +66,12 @@ const textoNotificacao =
 
 const TAMANHO = 1080;
 
+// Limite de segurança do arquivo.
+// 40 MB é suficiente para praticamente qualquer
+// foto normal de celular, evitando arquivos gigantes.
+const TAMANHO_MAXIMO_ARQUIVO =
+    40 * 1024 * 1024;
+
 canvas.width = TAMANHO;
 canvas.height = TAMANHO;
 
@@ -85,11 +91,18 @@ moldura.src =
     caminhoMolduraAtual;
 
 
+// URL temporária da foto escolhida.
+// Será liberada da memória quando outra foto for aberta.
+let urlFotoAtual = null;
+
+
 // ============================================
 // ESTADO
 // ============================================
 
 let fotoCarregada = false;
+
+let carregandoFoto = false;
 
 let escalaBase = 1;
 
@@ -117,7 +130,12 @@ let blobFinal = null;
 // NOTIFICAÇÃO
 // ============================================
 
-function mostrarNotificacao(texto) {
+let temporizadorNotificacao = null;
+
+function mostrarNotificacao(
+    texto,
+    duracao = 3000
+) {
 
     textoNotificacao.textContent =
         texto;
@@ -126,16 +144,27 @@ function mostrarNotificacao(texto) {
         "mostrar"
     );
 
-    setTimeout(
-        function () {
 
-            notificacao.classList.remove(
-                "mostrar"
-            );
+    if (temporizadorNotificacao) {
 
-        },
-        2600
-    );
+        clearTimeout(
+            temporizadorNotificacao
+        );
+
+    }
+
+
+    temporizadorNotificacao =
+        setTimeout(
+            function () {
+
+                notificacao.classList.remove(
+                    "mostrar"
+                );
+
+            },
+            duracao
+        );
 
 }
 
@@ -154,16 +183,22 @@ function desenhar() {
     );
 
 
-    if (fotoCarregada) {
+    if (
+        fotoCarregada &&
+        foto.naturalWidth > 0 &&
+        foto.naturalHeight > 0
+    ) {
 
         const escalaFinal =
             escalaBase * zoom;
 
         const largura =
-            foto.width * escalaFinal;
+            foto.naturalWidth *
+            escalaFinal;
 
         const altura =
-            foto.height * escalaFinal;
+            foto.naturalHeight *
+            escalaFinal;
 
 
         ctx.save();
@@ -230,20 +265,30 @@ moldura.onerror =
     function () {
 
         console.error(
-            "Erro ao carregar:",
+            "Erro ao carregar a moldura:",
             caminhoMolduraAtual
+        );
+
+        mostrarNotificacao(
+            "Não foi possível carregar esta moldura."
         );
 
     };
 
 
 // ============================================
-// ESCOLHER FOTO
+// BOTÕES PARA ESCOLHER FOTO
 // ============================================
 
 btnEscolher.addEventListener(
     "click",
     function () {
+
+        if (carregandoFoto) {
+
+            return;
+
+        }
 
         inputFoto.click();
 
@@ -255,18 +300,147 @@ btnTrocarFoto.addEventListener(
     "click",
     function () {
 
+        if (carregandoFoto) {
+
+            return;
+
+        }
+
         inputFoto.click();
 
     }
 );
 
 
+// ============================================
+// IDENTIFICAR ARQUIVO DE IMAGEM
+// ============================================
+
+function arquivoPareceImagem(
+    arquivo
+) {
+
+    if (!arquivo) {
+
+        return false;
+
+    }
+
+
+    // Primeiro verifica o MIME informado
+    // pelo próprio navegador.
+
+    if (
+        arquivo.type &&
+        arquivo.type.startsWith("image/")
+    ) {
+
+        return true;
+
+    }
+
+
+    // Alguns celulares/navegadores podem não
+    // fornecer corretamente o MIME.
+    // Nesse caso verificamos a extensão.
+
+    const nome =
+        arquivo.name
+            .toLowerCase()
+            .trim();
+
+
+    const extensoesPermitidas = [
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp",
+        ".heic",
+        ".heif",
+        ".jfif",
+        ".avif"
+    ];
+
+
+    return extensoesPermitidas.some(
+        function (extensao) {
+
+            return nome.endsWith(
+                extensao
+            );
+
+        }
+    );
+
+}
+
+
+// ============================================
+// LIBERAR URL TEMPORÁRIA
+// ============================================
+
+function liberarUrlFotoAnterior() {
+
+    if (urlFotoAtual) {
+
+        URL.revokeObjectURL(
+            urlFotoAtual
+        );
+
+        urlFotoAtual = null;
+
+    }
+
+}
+
+
+// ============================================
+// ERRO AO ABRIR FOTO
+// ============================================
+
+function erroAoCarregarFoto(
+    arquivo
+) {
+
+    carregandoFoto = false;
+
+    fotoCarregada = false;
+
+    liberarUrlFotoAnterior();
+
+
+    console.error(
+        "O navegador não conseguiu decodificar a imagem:",
+        arquivo
+    );
+
+
+    mostrarNotificacao(
+        "⚠️ Não foi possível abrir esta foto. Tente outra imagem ou uma versão em JPG/PNG.",
+        5500
+    );
+
+}
+
+
+// ============================================
+// ESCOLHER FOTO
+// ============================================
+
 inputFoto.addEventListener(
     "change",
     function () {
 
         const arquivo =
-            this.files[0];
+            this.files &&
+                this.files.length > 0
+                ? this.files[0]
+                : null;
+
+
+        // Permite selecionar novamente
+        // o mesmo arquivo posteriormente.
+        this.value = "";
 
 
         if (!arquivo) {
@@ -277,11 +451,14 @@ inputFoto.addEventListener(
 
 
         if (
-            !arquivo.type.startsWith("image/")
+            !arquivoPareceImagem(
+                arquivo
+            )
         ) {
 
-            alert(
-                "Escolha uma imagem válida."
+            mostrarNotificacao(
+                "⚠️ O arquivo escolhido não parece ser uma imagem válida.",
+                4500
             );
 
             return;
@@ -289,54 +466,135 @@ inputFoto.addEventListener(
         }
 
 
-        const leitor =
-            new FileReader();
+        if (
+            arquivo.size >
+            TAMANHO_MAXIMO_ARQUIVO
+        ) {
+
+            mostrarNotificacao(
+                "⚠️ Esta foto é muito grande. Escolha uma foto menor ou envie uma captura de tela dela.",
+                5500
+            );
+
+            return;
+
+        }
 
 
-        leitor.onload =
-            function (evento) {
+        carregandoFoto = true;
 
-                foto.onload =
-                    function () {
+        fotoCarregada = false;
 
-                        fotoCarregada = true;
-
-                        blobFinal = null;
-
-                        prepararFoto();
-
-                        placeholder.classList.add(
-                            "escondido"
-                        );
-
-                        areaEdicao.classList.remove(
-                            "escondido"
-                        );
-
-                        resultado.classList.add(
-                            "escondido"
-                        );
-
-                        btnEscolher.textContent =
-                            "📷 Escolher outra foto";
-
-                        desenhar();
-
-                    };
+        blobFinal = null;
 
 
-                foto.src =
-                    evento.target.result;
+        mostrarNotificacao(
+            "📷 Carregando foto...",
+            1800
+        );
+
+
+        liberarUrlFotoAnterior();
+
+
+        try {
+
+            urlFotoAtual =
+                URL.createObjectURL(
+                    arquivo
+                );
+
+        }
+        catch (erro) {
+
+            console.error(
+                "Erro ao criar URL da foto:",
+                erro
+            );
+
+            carregandoFoto = false;
+
+            mostrarNotificacao(
+                "⚠️ Não foi possível ler esta foto.",
+                4500
+            );
+
+            return;
+
+        }
+
+
+        foto.onload =
+            function () {
+
+                // Verifica se a imagem realmente
+                // possui dimensões válidas.
+
+                if (
+                    !foto.naturalWidth ||
+                    !foto.naturalHeight
+                ) {
+
+                    erroAoCarregarFoto(
+                        arquivo
+                    );
+
+                    return;
+
+                }
+
+
+                carregandoFoto = false;
+
+                fotoCarregada = true;
+
+                blobFinal = null;
+
+
+                prepararFoto();
+
+
+                placeholder.classList.add(
+                    "escondido"
+                );
+
+
+                areaEdicao.classList.remove(
+                    "escondido"
+                );
+
+
+                resultado.classList.add(
+                    "escondido"
+                );
+
+
+                btnEscolher.textContent =
+                    "📷 Escolher outra foto";
+
+
+                desenhar();
+
+
+                mostrarNotificacao(
+                    "✅ Foto carregada!"
+                );
 
             };
 
 
-        leitor.readAsDataURL(
-            arquivo
-        );
+        foto.onerror =
+            function () {
+
+                erroAoCarregarFoto(
+                    arquivo
+                );
+
+            };
 
 
-        this.value = "";
+        foto.src =
+            urlFotoAtual;
 
     }
 );
@@ -348,10 +606,19 @@ inputFoto.addEventListener(
 
 function prepararFoto() {
 
+    const larguraFoto =
+        foto.naturalWidth ||
+        foto.width;
+
+    const alturaFoto =
+        foto.naturalHeight ||
+        foto.height;
+
+
     escalaBase =
         Math.max(
-            TAMANHO / foto.width,
-            TAMANHO / foto.height
+            TAMANHO / larguraFoto,
+            TAMANHO / alturaFoto
         );
 
 
@@ -424,6 +691,13 @@ controleZoom.addEventListener(
     "input",
     function () {
 
+        if (!fotoCarregada) {
+
+            return;
+
+        }
+
+
         zoom =
             parseFloat(
                 this.value
@@ -453,6 +727,13 @@ controleZoom.addEventListener(
 btnCentralizar.addEventListener(
     "click",
     function () {
+
+        if (!fotoCarregada) {
+
+            return;
+
+        }
+
 
         posX =
             TAMANHO / 2;
@@ -488,14 +769,25 @@ function limitarPosicao() {
     }
 
 
+    const larguraFoto =
+        foto.naturalWidth ||
+        foto.width;
+
+    const alturaFoto =
+        foto.naturalHeight ||
+        foto.height;
+
+
     const escalaFinal =
         escalaBase * zoom;
 
     const largura =
-        foto.width * escalaFinal;
+        larguraFoto *
+        escalaFinal;
 
     const altura =
-        foto.height * escalaFinal;
+        alturaFoto *
+        escalaFinal;
 
 
     const metadeLargura =
@@ -506,13 +798,15 @@ function limitarPosicao() {
 
 
     const minX =
-        TAMANHO - metadeLargura;
+        TAMANHO -
+        metadeLargura;
 
     const maxX =
         metadeLargura;
 
     const minY =
-        TAMANHO - metadeAltura;
+        TAMANHO -
+        metadeAltura;
 
     const maxY =
         metadeAltura;
@@ -642,10 +936,12 @@ window.addEventListener(
 
 
         posX +=
-            posicao.x - ultimoX;
+            posicao.x -
+            ultimoX;
 
         posY +=
-            posicao.y - ultimoY;
+            posicao.y -
+            ultimoY;
 
 
         ultimoX =
@@ -716,7 +1012,9 @@ canvas.addEventListener(
         }
 
 
-        if (evento.touches.length === 1) {
+        if (
+            evento.touches.length === 1
+        ) {
 
             arrastando = true;
 
@@ -743,7 +1041,9 @@ canvas.addEventListener(
         }
 
 
-        if (evento.touches.length === 2) {
+        if (
+            evento.touches.length === 2
+        ) {
 
             arrastando = false;
 
@@ -800,10 +1100,12 @@ canvas.addEventListener(
 
 
             posX +=
-                posicao.x - ultimoX;
+                posicao.x -
+                ultimoX;
 
             posY +=
-                posicao.y - ultimoY;
+                posicao.y -
+                ultimoY;
 
 
             ultimoX =
@@ -940,21 +1242,44 @@ function criarBlobFinal() {
     return new Promise(
         function (resolve) {
 
-            desenhar();
+            try {
+
+                desenhar();
 
 
-            canvas.toBlob(
-                function (blob) {
+                canvas.toBlob(
+                    function (blob) {
 
-                    blobFinal =
-                        blob;
+                        if (!blob) {
 
-                    resolve(blob);
+                            resolve(null);
 
-                },
-                "image/png",
-                1
-            );
+                            return;
+
+                        }
+
+
+                        blobFinal =
+                            blob;
+
+                        resolve(blob);
+
+                    },
+                    "image/png",
+                    1
+                );
+
+            }
+            catch (erro) {
+
+                console.error(
+                    "Erro ao gerar imagem:",
+                    erro
+                );
+
+                resolve(null);
+
+            }
 
         }
     );
@@ -972,8 +1297,8 @@ btnGerar.addEventListener(
 
         if (!fotoCarregada) {
 
-            alert(
-                "Escolha sua foto primeiro."
+            mostrarNotificacao(
+                "📷 Escolha sua foto primeiro."
             );
 
             return;
@@ -1003,11 +1328,13 @@ btnGerar.addEventListener(
 
 
         if (
-            imagemResultado.dataset.urlAnterior
+            imagemResultado.dataset
+                .urlAnterior
         ) {
 
             URL.revokeObjectURL(
-                imagemResultado.dataset.urlAnterior
+                imagemResultado.dataset
+                    .urlAnterior
             );
 
         }
@@ -1017,7 +1344,8 @@ btnGerar.addEventListener(
             url;
 
 
-        imagemResultado.dataset.urlAnterior =
+        imagemResultado.dataset
+            .urlAnterior =
             url;
 
 
@@ -1058,6 +1386,10 @@ btnBaixar.addEventListener(
 
 
         if (!blob) {
+
+            mostrarNotificacao(
+                "Não foi possível preparar a imagem."
+            );
 
             return;
 
@@ -1105,7 +1437,7 @@ btnBaixar.addEventListener(
                 );
 
             },
-            1000
+            1500
         );
 
 
@@ -1148,20 +1480,37 @@ btnCompartilhar.addEventListener(
         }
 
 
-        const arquivo =
-            new File(
-                [blob],
-                "coracao-em-chamas.png",
-                {
-                    type: "image/png"
-                }
+        let arquivo;
+
+
+        try {
+
+            arquivo =
+                new File(
+                    [blob],
+                    "coracao-em-chamas.png",
+                    {
+                        type:
+                            "image/png"
+                    }
+                );
+
+        }
+        catch (erro) {
+
+            console.error(
+                "Erro ao preparar arquivo:",
+                erro
             );
 
+            baixarComoFallback(
+                blob
+            );
 
-        /*
-            Verifica se o navegador consegue
-            compartilhar arquivos.
-        */
+            return;
+
+        }
+
 
         if (
             navigator.share &&
@@ -1177,7 +1526,8 @@ btnCompartilhar.addEventListener(
 
                 await navigator.share(
                     {
-                        files: [arquivo],
+                        files:
+                            [arquivo],
 
                         title:
                             "Coração em Chamas",
@@ -1190,12 +1540,6 @@ btnCompartilhar.addEventListener(
             }
             catch (erro) {
 
-                /*
-                    AbortError significa apenas
-                    que a pessoa fechou o menu
-                    de compartilhamento.
-                */
-
                 if (
                     erro.name !==
                     "AbortError"
@@ -1206,7 +1550,7 @@ btnCompartilhar.addEventListener(
                     );
 
                     mostrarNotificacao(
-                        "Não foi possível compartilhar."
+                        "Não foi possível compartilhar diretamente."
                     );
 
                 }
@@ -1216,61 +1560,74 @@ btnCompartilhar.addEventListener(
         }
         else {
 
-            /*
-                Navegador sem suporte:
-                fazemos o download.
-            */
-
-            const url =
-                URL.createObjectURL(
-                    blob
-                );
-
-
-            const link =
-                document.createElement(
-                    "a"
-                );
-
-
-            link.href =
-                url;
-
-            link.download =
-                "coracao-em-chamas-foto-oficial.png";
-
-
-            document.body.appendChild(
-                link
-            );
-
-            link.click();
-
-            document.body.removeChild(
-                link
-            );
-
-
-            setTimeout(
-                function () {
-
-                    URL.revokeObjectURL(
-                        url
-                    );
-
-                },
-                1000
-            );
-
-
-            mostrarNotificacao(
-                "Seu navegador não permite compartilhar diretamente. A foto foi baixada."
+            baixarComoFallback(
+                blob
             );
 
         }
 
     }
 );
+
+
+// ============================================
+// DOWNLOAD DE SEGURANÇA
+// ============================================
+
+function baixarComoFallback(
+    blob
+) {
+
+    const url =
+        URL.createObjectURL(
+            blob
+        );
+
+
+    const link =
+        document.createElement(
+            "a"
+        );
+
+
+    link.href =
+        url;
+
+    link.download =
+        "coracao-em-chamas-foto-oficial.png";
+
+
+    document.body.appendChild(
+        link
+    );
+
+
+    link.click();
+
+
+    document.body.removeChild(
+        link
+    );
+
+
+    setTimeout(
+        function () {
+
+            URL.revokeObjectURL(
+                url
+            );
+
+        },
+        1500
+    );
+
+
+    mostrarNotificacao(
+        "Seu navegador não permite compartilhar diretamente. A foto foi salva no aparelho.",
+        4500
+    );
+
+}
 
 
 // ============================================
@@ -1294,6 +1651,33 @@ btnEditar.addEventListener(
                     block: "start"
                 }
             );
+
+    }
+);
+
+
+// ============================================
+// LIMPEZA DE MEMÓRIA
+// ============================================
+
+window.addEventListener(
+    "beforeunload",
+    function () {
+
+        liberarUrlFotoAnterior();
+
+
+        if (
+            imagemResultado.dataset
+                .urlAnterior
+        ) {
+
+            URL.revokeObjectURL(
+                imagemResultado.dataset
+                    .urlAnterior
+            );
+
+        }
 
     }
 );
